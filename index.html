@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cek Pulsa — Dashboard Realtime</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+    <style>
+        :root {
+            --bg: #080c0a;
+            --bg2: #0e1612;
+            --bg3: #14201a;
+            --bg4: #1a2b23;
+            --border: #1e3328;
+            --border2: #2a4a38;
+            --text: #e4f0e8;
+            --text2: #8aaa98;
+            --text3: #5a7a68;
+            --accent: #22c55e;
+            --accent2: #16a34a;
+            --accent-glow: rgba(34,197,94,0.12);
+            --warn: #f59e0b;
+            --warn-glow: rgba(245,158,11,0.12);
+            --danger: #ef4444;
+            --danger-glow: rgba(239,68,68,0.12);
+            --info: #06b6d4;
+            --info-glow: rgba(6,182,212,0.12);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        .bg-deco {
+            position: fixed; inset: 0; z-index: 0; pointer-events: none;
+            background:
+                radial-gradient(ellipse 700px 500px at 5% 10%, rgba(34,197,94,0.04), transparent),
+                radial-gradient(ellipse 500px 600px at 95% 85%, rgba(34,197,94,0.03), transparent);
+        }
+        .bg-grid {
+            position: fixed; inset: 0; z-index: 0; pointer-events: none;
+            background-image:
+                linear-gradient(rgba(34,197,94,0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(34,197,94,0.02) 1px, transparent 1px);
+            background-size: 50px 50px;
+        }
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: var(--bg); }
+        ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+        .input-f {
+            width: 100%; background: var(--bg); border: 1px solid var(--border);
+            border-radius: 8px; padding: 10px 14px; color: var(--text);
+            font-family: 'Space Grotesk', sans-serif; font-size: 0.88rem;
+            outline: none; transition: border-color 0.2s;
+        }
+        .input-f:focus { border-color: var(--accent); }
+        .input-f::placeholder { color: var(--text3); }
+        select.input-f {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath d='M5 7L0 2h10z' fill='%235a7a68'/%3E%3C/svg%3E");
+            background-repeat: no-repeat; background-position: right 12px center; padding-right: 34px;
+        }
+        select.input-f option { background: var(--bg2); color: var(--text); }
+        .btn {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 10px 20px; border-radius: 8px; font-weight: 600; font-size: 0.88rem;
+            cursor: pointer; border: none; transition: all 0.15s;
+            font-family: 'Space Grotesk', sans-serif;
+        }
+        .btn-p { background: var(--accent); color: var(--bg); }
+        .btn-p:hover { background: #2dd468; transform: translateY(-1px); }
+        .btn-s { background: var(--bg3); border: 1px solid var(--border); color: var(--text); }
+        .btn-s:hover { border-color: var(--border2); background: var(--bg4); }
+        .btn-d { background: var(--danger-glow); color: var(--danger); border: 1px solid rgba(239,68,68,0.2); }
+        .btn-d:hover { background: rgba(239,68,68,0.2); }
+        .btn-w { background: var(--warn-glow); color: var(--warn); border: 1px solid rgba(245,158,11,0.2); }
+        .btn-w:hover { background: rgba(245,158,11,0.2); }
+        .btn-sm { padding: 6px 14px; font-size: 0.8rem; }
+        .btn-icon {
+            width: 34px; height: 34px; padding: 0;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 8px; background: var(--bg3); border: 1px solid var(--border);
+            color: var(--text2); cursor: pointer; transition: all 0.15s; font-size: 0.8rem;
+        }
+        .btn-icon:hover { border-color: var(--accent); color: var(--accent); }
+        .card { background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+        .stat-card {
+            background: var(--bg2); border: 1px solid var(--border); border-radius: 14px;
+            padding: 22px; position: relative; overflow: hidden; transition: all 0.25s;
+        }
+        .stat-card::after {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+            opacity: 0; transition: opacity 0.25s;
+        }
+        .stat-card:hover { border-color: var(--border2); transform: translateY(-2px); }
+        .stat-card:hover::after { opacity: 1; }
+        .stat-card.green::after { background: var(--accent); }
+        .stat-card.yellow::after { background: var(--warn); }
+        .stat-card.red::after { background: var(--danger); }
+        .stat-card.cyan::after { background: var(--info); }
+        .trow {
+            display: grid; align-items: center; padding: 14px 20px;
+            border-bottom: 1px solid var(--border); transition: background 0.12s; gap: 12px;
+        }
+        .trow:hover { background: var(--accent-glow); }
+        .trow:last-child { border-bottom: none; }
+        .theader {
+            display: grid; align-items: center; padding: 12px 20px;
+            border-bottom: 1px solid var(--border); gap: 12px;
+            font-size: 0.75rem; font-weight: 700; color: var(--text3);
+            text-transform: uppercase; letter-spacing: 0.5px; background: var(--bg3);
+        }
+        .badge {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 4px 10px; border-radius: 20px; font-size: 0.72rem; font-weight: 700; white-space: nowrap;
+        }
+        .badge-active { background: var(--accent-glow); color: var(--accent); }
+        .badge-warn { background: var(--warn-glow); color: var(--warn); }
+        .badge-expired { background: var(--danger-glow); color: var(--danger); }
+        .badge-provider {
+            padding: 2px 8px; border-radius: 4px; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.3px;
+        }
+        .badge-tsel { background: rgba(239,68,68,0.12); color: #f87171; }
+        .badge-xl { background: rgba(59,130,246,0.12); color: #60a5fa; }
+        .badge-axis { background: rgba(168,85,247,0.12); color: #c084fc; }
+        .badge-indo { background: rgba(245,158,11,0.12); color: #fbbf24; }
+        .badge-smart { background: rgba(34,197,94,0.12); color: #4ade80; }
+        .badge-tri { background: rgba(6,182,212,0.12); color: #22d3ee; }
+        .badge-other { background: rgba(148,163,184,0.12); color: #94a3b8; }
+        .countdown-box {
+            display: flex; flex-direction: column; align-items: center;
+            padding: 6px 12px; border-radius: 10px; min-width: 68px;
+        }
+        .countdown-box.active { background: var(--accent-glow); }
+        .countdown-box.warn { background: var(--warn-glow); }
+        .countdown-box.expired { background: var(--danger-glow); }
+        .countdown-num {
+            font-family: 'JetBrains Mono', monospace; font-size: 1.25rem; font-weight: 700; line-height: 1;
+        }
+        .countdown-label { font-size: 0.58rem; color: var(--text3); margin-top: 2px; font-weight: 600; text-transform: uppercase; }
+        .progress-bar { height: 4px; border-radius: 2px; background: var(--bg); overflow: hidden; }
+        .progress-fill { height: 100%; border-radius: 2px; transition: width 0.5s; }
+        .modal-bg {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(6px);
+            z-index: 100; display: flex; align-items: center; justify-content: center;
+            opacity: 0; pointer-events: none; transition: opacity 0.25s;
+        }
+        .modal-bg.open { opacity: 1; pointer-events: all; }
+        .modal-box {
+            background: var(--bg2); border: 1px solid var(--border); border-radius: 16px;
+            padding: 28px; width: 92%; max-width: 540px; max-height: 88vh; overflow-y: auto;
+            transform: scale(0.95) translateY(10px); transition: transform 0.25s;
+        }
+        .modal-bg.open .modal-box { transform: scale(1) translateY(0); }
+        .toast-wrap {
+            position: fixed; top: 16px; right: 16px; z-index: 200;
+            display: flex; flex-direction: column; gap: 8px;
+        }
+        .toast {
+            padding: 12px 18px; border-radius: 10px; font-size: 0.85rem; font-weight: 500;
+            display: flex; align-items: center; gap: 10px; min-width: 260px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+            animation: tin 0.3s ease, tout 0.3s ease 2.7s forwards;
+        }
+        .toast-s { background: #071f12; border: 1px solid rgba(34,197,94,0.3); color: var(--accent); }
+        .toast-e { background: #1f0707; border: 1px solid rgba(239,68,68,0.3); color: var(--danger); }
+        .toast-i { background: #071a1f; border: 1px solid rgba(6,182,212,0.3); color: var(--info); }
+        @keyframes tin { from { opacity:0; transform:translateX(30px); } to { opacity:1; transform:translateX(0); } }
+        @keyframes tout { from { opacity:1; } to { opacity:0; transform:translateX(30px); } }
+        .fade-in { animation: fi 0.3s ease; }
+        @keyframes fi { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+        .pulse-ring {
+            width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pr 2s infinite;
+        }
+        @keyframes pr { 0%,100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.4); } 50% { box-shadow: 0 0 0 6px rgba(34,197,94,0); } }
+        .ussd-chip {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 5px 12px; border-radius: 6px; background: var(--bg3);
+            border: 1px solid var(--border); font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem; color: var(--text2); cursor: pointer; transition: all 0.15s;
+        }
+        .ussd-chip:hover { border-color: var(--accent); color: var(--accent); }
+        .sync-dot {
+            width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px;
+        }
+        .sync-dot.on { background: var(--accent); animation: pr 2s infinite; }
+        .sync-dot.off { background: var(--danger); }
+        .sync-dot.loading { background: var(--warn); animation: blink 1s infinite; }
+        @keyframes blink { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+        @media (max-width: 1100px) {
+            .trow, .theader { grid-template-columns: 36px 1fr 100px 80px 80px auto !important; }
+            .hide-md { display: none !important; }
+        }
+        @media (max-width: 768px) {
+            .trow, .theader { grid-template-columns: 32px 1fr 70px 70px auto !important; }
+            .hide-sm { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-deco"></div>
+    <div class="bg-grid"></div>
+    <div class="toast-wrap" id="toasts"></div>
+
+    <div style="position:relative;z-index:1;">
+        <!-- Header -->
+        <header style="padding:16px 24px;border-bottom:1px solid var(--border);background:rgba(8,12,10,0.9);backdrop-filter:blur(12px);position:sticky;top:0;z-index:30;">
+            <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <div style="width:38px;height:38px;border-radius:10px;background:var(--accent-glow);display:flex;align-items:center;justify-content:center;">
+                        <i class="fa-solid fa-signal" style="color:var(--accent);"></i>
+                    </div>
+                    <div>
+                        <h1 style="font-size:1.2rem;font-weight:700;letter-spacing:-0.5px;">CEK PULSA</h1>
+                        <p style="font-size:0.68rem;color:var(--text3);display:flex;align-items:center;">
+                            <span class="sync-dot loading" id="syncDot"></span>
+                            <span id="syncText">Menghubungkan...</span>
+                        </p>
+                    </div>
+                </div>
+                <div style="display:flex;gap:6px;margin-left:8px;flex-wrap:wrap;" class="hide-sm">
+                    <div class="ussd-chip" onclick="copyUSSD('*888#')"><i class="fa-solid fa-phone" style="font-size:0.6rem;"></i> TSEL *888#</div>
+                    <div class="ussd-chip" onclick="copyUSSD('*808#817#')"><i class="fa-solid fa-phone" style="font-size:0.6rem;"></i> XL *808#817#</div>
+                    <div class="ussd-chip" onclick="copyUSSD('*123#')"><i class="fa-solid fa-phone" style="font-size:0.6rem;"></i> AXIS *123#</div>
+                    <div class="ussd-chip" onclick="copyUSSD('*555#')"><i class="fa-solid fa-phone" style="font-size:0.6rem;"></i> INDOSAT *555#</div>
+                </div>
+                <div style="margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                    <div style="position:relative;" class="hide-sm">
+                        <input type="text" class="input-f" placeholder="Cari nama/nomor..." style="width:200px;padding-left:32px;font-size:0.82rem;" id="searchInput" oninput="renderTable()">
+                        <i class="fa-solid fa-magnifying-glass" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:0.78rem;"></i>
+                    </div>
+                    <select class="input-f" style="width:120px;font-size:0.8rem;" id="filterProvider" onchange="renderTable()">
+                        <option value="">Semua</option>
+                        <option value="TELKOMSEL">Telkomsel</option>
+                        <option value="XL">XL</option>
+                        <option value="AXIS">Axis</option>
+                        <option value="INDOSAT">Indosat</option>
+                        <option value="SMARTFREN">Smartfren</option>
+                        <option value="TRI">Tri</option>
+                        <option value="LAINNYA">Lainnya</option>
+                    </select>
+                    <select class="input-f" style="width:130px;font-size:0.8rem;" id="filterStatus" onchange="renderTable()">
+                        <option value="">Semua Status</option>
+                        <option value="active">Aktif</option>
+                        <option value="warn">Hampir Habis</option>
+                        <option value="expired">Expired</option>
+                    </select>
+                    <button class="btn btn-p" onclick="openModal()"><i class="fa-solid fa-plus"></i> <span class="hide-sm">Tambah</span></button>
+                </div>
+            </div>
+            <!-- Search mobile -->
+            <div style="margin-top:10px;display:none;" id="mobileSearch">
+                <input type="text" class="input-f" placeholder="Cari nama/nomor..." style="font-size:0.82rem;" id="searchInputMobile" oninput="document.getElementById('searchInput').value=this.value;renderTable();">
+            </div>
+        </header>
+
+        <main style="padding:20px 24px;">
+            <div class="fade-in">
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:20px;" id="statsArea"></div>
+                <div class="card">
+                    <div class="theader" style="grid-template-columns:36px 1fr 100px 100px 85px 85px 80px auto;" id="tableHeader">
+                        <span>No</span><span>Nama / Nomor</span><span>Provider</span>
+                        <span class="hide-sm">Saldo</span><span class="hide-sm">Mulai</span>
+                        <span>Berakhir</span><span>Sisa</span><span></span>
+                    </div>
+                    <div id="tableBody"></div>
+                </div>
+                <div class="card" style="margin-top:16px;" id="historySection">
+                    <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+                        <h3 style="font-weight:700;font-size:0.92rem;"><i class="fa-solid fa-clock-rotate-left" style="color:var(--info);margin-right:8px;"></i>Riwayat Perpanjangan</h3>
+                        <button class="btn btn-s btn-sm" onclick="clearHistory()"><i class="fa-solid fa-broom"></i> Bersihkan</button>
+                    </div>
+                    <div id="historyBody" style="max-height:280px;overflow-y:auto;"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal-bg" id="modalBg" onclick="if(event.target===this)closeModal()">
+        <div class="modal-box" id="modalBox"></div>
+    </div>
+    <div class="modal-bg" id="confirmBg" onclick="if(event.target===this)closeConfirm()">
+        <div class="modal-box" style="max-width:400px;text-align:center;" id="confirmBox"></div>
+    </div>
+
+    <script>
+    // =============================================
+    //  🔧 KONFIGURASI FIREBASE — GANTI DENGAN MILIK ANDA
+    // =============================================
+    const firebaseConfig = {
+    apiKey: "AIzaSyDVMQ1spnFrZlHaKQ_wTmfZIHAR2rYGjAE",
+    authDomain: "cek-masaaktif-app.firebaseapp.com",
+    databaseURL: "https://cek-masaaktif-app-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "cek-masaaktif-app",
+    storageBucket: "cek-masaaktif-app.firebasestorage.app",
+    messagingSenderId: "333052314676",
+    appId: "1:333052314676:web:9ff462988ee81d529eb661"
+};
+
+    // =============================================
+    //  INISIALISASI FIREBASE
+    // =============================================
+    let db = null;
+    let dataRef = null;
+    let histRef = null;
+    let appData = [];
+    let appHistory = [];
+    let editingId = null;
+    let confirmCb = null;
+    let isOnline = false;
+
+    function initFirebase() {
+        try {
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.database();
+            dataRef = db.ref('pulsa_data');
+            histRef = db.ref('pulsa_history');
+
+            // Listener realtime untuk data utama
+            dataRef.on('value', (snapshot) => {
+                const raw = snapshot.val();
+                appData = raw ? Object.keys(raw).map(k => ({ id: k, ...raw[k] })) : [];
+                renderAll();
+                setSyncStatus('on');
+            }, (error) => {
+                console.error('Firebase error:', error);
+                setSyncStatus('off');
+                toast('Gagal terhubung ke database', 'e');
+            });
+
+            // Listener realtime untuk riwayat
+            histRef.on('value', (snapshot) => {
+                const raw = snapshot.val();
+                appHistory = raw ? Object.keys(raw).map(k => ({ id: k, ...raw[k] })) : [];
+                renderHistory();
+            });
+
+            // Deteksi koneksi
+            db.ref('.info/connected').on('value', (snap) => {
+                isOnline = snap.val() === true;
+                setSyncStatus(isOnline ? 'on' : 'off');
+            });
+
+        } catch(e) {
+            console.error('Firebase init error:', e);
+            setSyncStatus('off');
+            toast('Gagal inisialisasi Firebase. Cek konfigurasi.', 'e');
+        }
+    }
+
+    function setSyncStatus(state) {
+        const dot = document.getElementById('syncDot');
+        const txt = document.getElementById('syncText');
+        dot.className = 'sync-dot ' + state;
+        if (state === 'on') txt.textContent = 'Tersinkronisasi realtime';
+        else if (state === 'off') txt.textContent = 'Tidak terhubung';
+        else txt.textContent = 'Menghubungkan...';
+    }
+
+    // =============================================
+    //  SIMPAN KE FIREBASE
+    // =============================================
+    function saveItem(item) {
+        if (!item.id) item.id = dataRef.push().key;
+        dataRef.child(item.id).set(item);
+    }
+
+    function removeItem(id) {
+        dataRef.child(id).remove();
+    }
+
+    function addHistoryEntry(entry) {
+        const key = histRef.push().key;
+        histRef.child(key).set(entry);
+    }
+
+    function clearHistoryData() {
+        histRef.remove();
+    }
+
+    // =============================================
+    //  HITUNG MASA AKTIF
+    // =============================================
+    function calcRemaining(endDate) {
+        if (!endDate) return { days: 0, status: 'expired' };
+        const now = new Date(); now.setHours(0,0,0,0);
+        const end = new Date(endDate); end.setHours(0,0,0,0);
+        const diff = Math.ceil((end - now) / 86400000);
+        return { days: diff, status: diff <= 0 ? 'expired' : diff <= 7 ? 'warn' : 'active' };
+    }
+
+    function calcPercent(start, end) {
+        if (!start || !end) return 0;
+        const now = new Date(); now.setHours(0,0,0,0);
+        const s = new Date(start); s.setHours(0,0,0,0);
+        const e = new Date(end); e.setHours(0,0,0,0);
+        const total = e - s; if (total <= 0) return 0;
+        return Math.round(Math.max(0, Math.min(100, (1 - (now - s) / total) * 100)));
+    }
+
+    // =============================================
+    //  RENDER
+    // =============================================
+    function renderAll() {
+        renderStats();
+        renderTable();
+        renderHistory();
+    }
+
+    function renderStats() {
+        let active=0, warn=0, expired=0;
+        appData.forEach(d => {
+            const r = calcRemaining(d.masaAktifAkhir);
+            if (r.status==='active') active++;
+            else if (r.status==='warn') warn++;
+            else expired++;
+        });
+        document.getElementById('statsArea').innerHTML = `
+            <div class="stat-card cyan">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                    <span style="font-size:0.75rem;color:var(--text3);font-weight:600;">Total Nomor</span>
+                    <div style="width:32px;height:32px;border-radius:8px;background:var(--info-glow);display:flex;align-items:center;justify-content:center;">
+                        <i class="fa-solid fa-sim-card" style="color:var(--info);font-size:0.8rem;"></i>
+                    </div>
+                </div>
+                <div style="font-size:1.8rem;font-weight:700;">${appData.length}</div>
+            </div>
+            <div class="stat-card green">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                    <span style="font-size:0.75rem;color:var(--text3);font-weight:600;">Aktif</span>
+                    <div style="width:32px;height:32px;border-radius:8px;background:var(--accent-glow);display:flex;align-items:center;justify-content:center;">
+                        <i class="fa-solid fa-circle-check" style="color:var(--accent);font-size:0.8rem;"></i>
+                    </div>
+                </div>
+                <div style="font-size:1.8rem;font-weight:700;color:var(--accent);">${active}</div>
+            </div>
+            <div class="stat-card yellow">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                    <span style="font-size:0.75rem;color:var(--text3);font-weight:600;">Hampir Habis</span>
+                    <div style="width:32px;height:32px;border-radius:8px;background:var(--warn-glow);display:flex;align-items:center;justify-content:center;">
+                        <i class="fa-solid fa-triangle-exclamation" style="color:var(--warn);font-size:0.8rem;"></i>
+                    </div>
+                </div>
+                <div style="font-size:1.8rem;font-weight:700;color:var(--warn);">${warn}</div>
+            </div>
+            <div class="stat-card red">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                    <span style="font-size:0.75rem;color:var(--text3);font-weight:600;">Expired</span>
+                    <div style="width:32px;height:32px;border-radius:8px;background:var(--danger-glow);display:flex;align-items:center;justify-content:center;">
+                        <i class="fa-solid fa-circle-xmark" style="color:var(--danger);font-size:0.8rem;"></i>
+                    </div>
+                </div>
+                <div style="font-size:1.8rem;font-weight:700;color:var(--danger);">${expired}</div>
+            </div>`;
+    }
+
+    function renderTable() {
+        const q = (document.getElementById('searchInput').value || '').toLowerCase();
+        const fp = document.getElementById('filterProvider').value;
+        const fs = document.getElementById('filterStatus').value;
+
+        let filtered = appData.filter(d => {
+            const mq = (d.nama||'').toLowerCase().includes(q) || (d.nomorHP||'').includes(q) || (d.nomorRekening||'').toLowerCase().includes(q);
+            const mp = !fp || d.provider === fp;
+            const r = calcRemaining(d.masaAktifAkhir);
+            const ms = !fs || r.status === fs;
+            return mq && mp && ms;
+        });
+
+        filtered.sort((a,b) => {
+            const ra = calcRemaining(a.masaAktifAkhir);
+            const rb = calcRemaining(b.masaAktifAkhir);
+            const ord = { expired:0, warn:1, active:2 };
+            if (ord[ra.status] !== ord[rb.status]) return ord[ra.status] - ord[rb.status];
+            return ra.days - rb.days;
+        });
+
+        if (!filtered.length) {
+            document.getElementById('tableBody').innerHTML = `<div style="text-align:center;padding:50px 20px;color:var(--text3);">
+                <i class="fa-solid fa-inbox" style="font-size:2.5rem;margin-bottom:12px;opacity:0.3;display:block;"></i>
+                <p>${!appData.length ? 'Belum ada data. Klik "Tambah" untuk memulai.' : 'Tidak ada data cocok.'}</p></div>`;
+            return;
+        }
+
+        let html = '';
+        filtered.forEach((d, i) => {
+            const rem = calcRemaining(d.masaAktifAkhir);
+            const pct = calcPercent(d.masaAktifMulai, d.masaAktifAkhir);
+            const pc = getProvClass(d.provider);
+            const dc = rem.status==='active'?'var(--accent)':rem.status==='warn'?'var(--warn)':'var(--danger)';
+            const bc = dc;
+            const saldo = d.saldo ? 'Rp '+Number(d.saldo).toLocaleString('id-ID') : '-';
+            const tglA = d.masaAktifAkhir ? fmtShort(d.masaAktifAkhir) : '-';
+            const tglM = d.masaAktifMulai ? fmtShort(d.masaAktifMulai) : '-';
+            html += `<div class="trow" style="grid-template-columns:36px 1fr 100px 100px 85px 85px 80px auto;">
+                <span style="font-size:0.8rem;color:var(--text3);font-weight:600;">${i+1}</span>
+                <div style="min-width:0;">
+                    <div style="font-weight:600;font-size:0.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(d.nama)}</div>
+                    <div class="mono" style="font-size:0.72rem;color:var(--text3);margin-top:1px;">${esc(d.nomorHP||d.nomorRekening||'-')}</div>
+                    <div class="progress-bar" style="margin-top:5px;width:100%;max-width:160px;">
+                        <div class="progress-fill" style="width:${pct}%;background:${bc};"></div>
+                    </div>
+                </div>
+                <span class="badge-provider ${pc}">${esc(d.provider||'-')}</span>
+                <span class="mono hide-sm" style="font-size:0.8rem;color:var(--text2);">${saldo}</span>
+                <span class="mono hide-sm" style="font-size:0.78rem;color:var(--text3);">${tglM}</span>
+                <span class="mono" style="font-size:0.78rem;color:var(--text2);">${tglA}</span>
+                <div class="countdown-box ${rem.status}">
+                    <span class="countdown-num" style="color:${dc};">${rem.days<=0?'<i class="fa-solid fa-xmark"></i>':rem.days}</span>
+                    <span class="countdown-label">${rem.days<=0?'Expired':'hari'}</span>
+                </div>
+                <div style="display:flex;gap:4px;">
+                    <button class="btn-icon" onclick="openExtendModal('${d.id}')" title="Perpanjang"><i class="fa-solid fa-rotate"></i></button>
+                    <button class="btn-icon" onclick="openModal('${d.id}')" title="Edit"><i class="fa-solid fa-pen"></i></button>
+                    <button class="btn-icon" style="color:var(--danger);" onclick="deleteItem('${d.id}')" title="Hapus"><i class="fa-solid fa-trash"></i></button>
+                </div>
+            </div>`;
+        });
+        document.getElementById('tableBody').innerHTML = html;
+    }
+
+    function renderHistory() {
+        const body = document.getElementById('historyBody');
+        if (!appHistory.length) {
+            body.innerHTML = `<div style="text-align:center;padding:24px 20px;color:var(--text3);font-size:0.82rem;">Belum ada riwayat</div>`;
+            return;
+        }
+        const sorted = [...appHistory].sort((a,b) => new Date(b.tanggal)-new Date(a.tanggal));
+        let html = '';
+        sorted.forEach(h => {
+            html += `<div class="trow" style="grid-template-columns:auto 1fr auto auto;">
+                <div style="width:30px;height:30px;border-radius:8px;background:var(--accent-glow);display:flex;align-items:center;justify-content:center;">
+                    <i class="fa-solid fa-rotate" style="color:var(--accent);font-size:0.65rem;"></i>
+                </div>
+                <div style="min-width:0;">
+                    <div style="font-weight:600;font-size:0.82rem;">${esc(h.nama)} <span class="mono" style="color:var(--text3);font-size:0.75rem;">${esc(h.nomorHP||'')}</span></div>
+                    <div style="font-size:0.7rem;color:var(--text3);margin-top:1px;">+${h.lama} hari — ${fmtShort(h.lamaBerakhir)} → ${fmtShort(h.berakhirBaru)}</div>
+                </div>
+                <span class="badge-provider ${getProvClass(h.provider)}">${esc(h.provider||'-')}</span>
+                <span style="font-size:0.7rem;color:var(--text3);white-space:nowrap;">${fmtFull(h.tanggal)}</span>
+            </div>`;
+        });
+        body.innerHTML = html;
+    }
+
+    // =============================================
+    //  MODAL TAMBAH / EDIT
+    // =============================================
+    function openModal(id) {
+        editingId = id || null;
+        const item = id ? appData.find(d => d.id === id) : null;
+        const isEdit = !!item;
+        document.getElementById('modalBox').innerHTML = `
+            <h3 style="font-weight:700;margin-bottom:20px;font-size:1.05rem;">${isEdit?'Edit Data':'Tambah Nomor Baru'}</h3>
+            <div style="display:flex;flex-direction:column;gap:12px;">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                    <div><label style="font-size:0.75rem;font-weight:600;color:var(--text2);display:block;margin-bottom:5px;">Nama</label>
+                        <input class="input-f" id="f_nama" value="${isEdit?esc(item.nama):''}" placeholder="Contoh: ANI"></div>
+                    <div><label style="font-size:0.75rem;font-weight:600;color:var(--text2);display:block;margin-bottom:5px;">Nomor HP</label>
+                        <input class="input-f mono" id="f_nomor" value="${isEdit?esc(item.nomorHP||''):''}" placeholder="081234567890"></div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                    <div><label style="font-size:0.75rem;font-weight:600;color:var(--text2);display:block;margin-bottom:5px;">Provider</label>
+                        <select class="input-f" id="f_provider">
+                            <option value="">Pilih</option>
+                            ${['TELKOMSEL','XL','AXIS','INDOSAT','SMARTFREN','TRI','LAINNYA'].map(p=>`<option value="${p}" ${isEdit&&item.provider===p?'selected':''}>${p.charAt(0)+p.slice(1).toLowerCase()}</option>`).join('')}
+                        </select></div>
+                    <div><label style="font-size:0.75rem;font-weight:600;color:var(--text2);display:block;margin-bottom:5px;">Saldo (Rp)</label>
+                        <input class="input-f mono" id="f_saldo" type="number" value="${isEdit&&item.saldo?item.saldo:''}" placeholder="146600"></div>
+                </div>
+                <div><label style="font-size:0.75rem;font-weight:600;color:var(--text2);display:block;margin-bottom:5px;">Nomor Rekening (opsional)</label>
+                    <input class="input-f mono" id="f_rekening" value="${isEdit?esc(item.nomorRekening||''):''}" placeholder="G1, G2, dll"></div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                    <div><label style="font-size:0.75rem;font-weight:600;color:var(--text2);display:block;margin-bottom:5px;">Masa Aktif Mulai</label>
+                        <input class="input-f mono" id="f_mulai" type="date" value="${isEdit?item.masaAktifMulai||'':''}"></div>
+                    <div><label style="font-size:0.75rem;font-weight:600;color:var(--text2);display:block;margin-bottom:5px;">Masa Aktif Berakhir</label>
+                        <input class="input-f mono" id="f_akhir" type="date" value="${isEdit?item.masaAktifAkhir||'':''}"></div>
+                </div>
+                <div><label style="font-size:0.75rem;font-weight:600;color:var(--text2);display:block;margin-bottom:5px;">Terakhir Isi Pulsa</label>
+                    <input class="input-f mono" id="f_topup" type="date" value="${isEdit?item.lastTopup||'':''}"></div>
+                <div><label style="font-size:0.75rem;font-weight:600;color:var(--text2);display:block;margin-bottom:5px;">Catatan</label>
+                    <input class="input-f" id="f_catatan" value="${isEdit?esc(item.catatan||''):''}" placeholder="Catatan tambahan"></div>
+            </div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:22px;">
+                <button class="btn btn-s" onclick="closeModal()">Batal</button>
+                <button class="btn btn-p" onclick="saveForm()">${isEdit?'Simpan':'Tambah'}</button>
+            </div>`;
+        document.getElementById('modalBg').classList.add('open');
+    }
+
+    function saveForm() {
+        const nama = document.getElementById('f_nama').value.trim();
+        const nomor = document.getElementById('f_nomor').value.trim();
+        const provider = document.getElementById('f_provider').value;
+        if (!nama) { toast('Nama wajib diisi','e'); return; }
+        if (!nomor) { toast('Nomor HP wajib diisi','e'); return; }
+        if (!provider) { toast('Provider wajib dipilih','e'); return; }
+
+        const obj = {
+            nama, nomorHP: nomor, provider,
+            saldo: document.getElementById('f_saldo').value || null,
+            nomorRekening: document.getElementById('f_rekening').value.trim() || null,
+            masaAktifMulai: document.getElementById('f_mulai').value || null,
+            masaAktifAkhir: document.getElementById('f_akhir').value || null,
+            lastTopup: document.getElementById('f_topup').value || null,
+            catatan: document.getElementById('f_catatan').value.trim() || null,
+            updatedAt: new Date().toISOString()
+        };
+
+        if (editingId) {
+            const existing = appData.find(d => d.id === editingId);
+            if (existing) obj.createdAt = existing.createdAt;
+            else obj.createdAt = new Date().toISOString();
+            obj.id = editingId;
+        } else {
+            obj.createdAt = new Date().toISOString();
+        }
+
+        saveItem(obj);
+        closeModal();
+        toast(editingId ? 'Data diperbarui' : 'Data ditambahkan', 's');
+    }
+
+    // =============================================
+    //  MODAL PERPANJANG
+    // =============================================
+    function openExtendModal(id) {
+        editingId = id;
+        const item = appData.find(d => d.id === id);
+        if (!item) return;
+        const rem = calcRemaining(item.masaAktifAkhir);
+
+        document.getElementById('modalBox').innerHTML = `
+            <h3 style="font-weight:700;margin-bottom:4px;font-size:1.05rem;">Perpanjang Masa Aktif</h3>
+            <p style="font-size:0.8rem;color:var(--text3);margin-bottom:18px;">${esc(item.nama)} — <span class="mono">${esc(item.nomorHP)}</span></p>
+            <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:18px;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+                    <span style="font-size:0.8rem;color:var(--text2);">Berakhir saat ini</span>
+                    <span class="mono" style="font-size:0.85rem;color:${rem.status==='active'?'var(--accent)':rem.status==='warn'?'var(--warn)':'var(--danger)'}; font-weight:700;">${item.masaAktifAkhir?fmtShort(item.masaAktifAkhir):'-'}</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;">
+                    <span style="font-size:0.8rem;color:var(--text2);">Sisa masa aktif</span>
+                    <span class="mono" style="font-size:0.85rem;font-weight:700;color:${rem.status==='active'?'var(--accent)':rem.status==='warn'?'var(--warn)':'var(--danger)'};">${Math.max(0,rem.days)} hari</span>
+                </div>
+            </div>
+            <div style="margin-bottom:18px;">
+                <label style="font-size:0.75rem;font-weight:600;color:var(--text2);display:block;margin-bottom:7px;">Tambah masa aktif</label>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+                    ${[7,14,30,60,90].map(n=>`<button class="btn btn-s btn-sm" onclick="document.getElementById('f_extDays').value=${n};updatePreview()">${n} hari</button>`).join('')}
+                </div>
+                <input class="input-f mono" type="number" id="f_extDays" placeholder="Jumlah hari" min="1" max="3650" value="30" oninput="updatePreview()">
+            </div>
+            <div style="background:var(--accent-glow);border:1px solid rgba(34,197,94,0.2);border-radius:10px;padding:12px;margin-bottom:18px;">
+                <div style="font-size:0.72rem;color:var(--text3);margin-bottom:3px;">Tanggal berakhir baru</div>
+                <div class="mono" style="font-size:0.95rem;font-weight:700;color:var(--accent);" id="extPreview">-</div>
+            </div>
+            <div style="margin-bottom:18px;">
+                <label style="font-size:0.75rem;font-weight:600;color:var(--text2);display:block;margin-bottom:5px;">Update saldo (opsional)</label>
+                <input class="input-f mono" type="number" id="f_extSaldo" value="${item.saldo||''}" placeholder="Saldo terbaru">
+            </div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;">
+                <button class="btn btn-s" onclick="closeModal()">Batal</button>
+                <button class="btn btn-w" onclick="doExtend('${id}')"><i class="fa-solid fa-rotate"></i> Perpanjang</button>
+            </div>`;
+
+        setTimeout(updatePreview, 50);
+        document.getElementById('modalBg').classList.add('open');
+    }
+
+    function updatePreview() {
+        const item = editingId ? appData.find(d => d.id === editingId) : null;
+        if (!item) return;
+        const days = parseInt(document.getElementById('f_extDays').value) || 0;
+        let base;
+        if (item.masaAktifAkhir) {
+            const e = new Date(item.masaAktifAkhir); e.setHours(0,0,0,0);
+            const now = new Date(); now.setHours(0,0,0,0);
+            base = e < now ? now : e;
+        } else { base = new Date(); }
+        const n = new Date(base); n.setDate(n.getDate() + days);
+        document.getElementById('extPreview').textContent = fmtFull(n.toISOString());
+    }
+
+    function doExtend(id) {
+        const item = appData.find(d => d.id === id);
+        if (!item) return;
+        const days = parseInt(document.getElementById('f_extDays').value) || 0;
+        if (days <= 0) { toast('Jumlah hari harus lebih dari 0','e'); return; }
+
+        let base;
+        if (item.masaAktifAkhir) {
+            const e = new Date(item.masaAktifAkhir); e.setHours(0,0,0,0);
+            const now = new Date(); now.setHours(0,0,0,0);
+            base = e < now ? now : e;
+        } else { base = new Date(); }
+
+        const oldEnd = item.masaAktifAkhir || null;
+        const n = new Date(base); n.setDate(n.getDate() + days);
+        const newEnd = n.toISOString().slice(0,10);
+
+        const updated = { ...item };
+        if (!updated.masaAktifMulai) updated.masaAktifMulai = new Date().toISOString().slice(0,10);
+        updated.masaAktifAkhir = newEnd;
+        updated.lastTopup = new Date().toISOString().slice(0,10);
+        const ns = document.getElementById('f_extSaldo').value;
+        if (ns !== '' && ns !== null) updated.saldo = ns;
+        updated.updatedAt = new Date().toISOString();
+
+        saveItem(updated);
+
+        addHistoryEntry({
+            itemId: id, nama: item.nama, nomorHP: item.nomorHP, provider: item.provider,
+            lama: days, lamaBerakhir: oldEnd, berakhirBaru: newEnd,
+            tanggal: new Date().toISOString()
+        });
+
+        closeModal();
+        toast(`Masa aktif +${days} hari berhasil`, 's');
+    }
+
+    // =============================================
+    //  HAPUS
+    // =============================================
+    function deleteItem(id) {
+        const item = appData.find(d => d.id === id);
+        if (!item) return;
+        showConfirm('Hapus Data', `Hapus "${item.nama}" (${item.nomorHP})?`, () => {
+            removeItem(id);
+            toast('Data dihapus','s');
+        });
+    }
+
+    function clearHistory() {
+        if (!appHistory.length) return;
+        showConfirm('Bersihkan Riwayat', 'Hapus semua riwayat perpanjangan?', () => {
+            clearHistoryData();
+            toast('Riwayat dibersihkan','s');
+        });
+    }
+
+    // =============================================
+    //  KONFIRMASI & MODAL
+    // =============================================
+    function showConfirm(title, msg, cb) {
+        confirmCb = cb;
+        document.getElementById('confirmBox').innerHTML = `
+            <div style="margin-bottom:12px;"><i class="fa-solid fa-triangle-exclamation" style="font-size:2rem;color:var(--warn);"></i></div>
+            <h3 style="font-weight:700;margin-bottom:6px;">${title}</h3>
+            <p style="font-size:0.82rem;color:var(--text3);margin-bottom:20px;">${msg}</p>
+            <div style="display:flex;gap:10px;justify-content:center;">
+                <button class="btn btn-s" onclick="closeConfirm()">Batal</button>
+                <button class="btn btn-d" onclick="confirmCb&&confirmCb();closeConfirm();">Hapus</button>
+            </div>`;
+        document.getElementById('confirmBg').classList.add('open');
+    }
+    function closeConfirm() { document.getElementById('confirmBg').classList.remove('open'); confirmCb=null; }
+    function closeModal() { document.getElementById('modalBg').classList.remove('open'); editingId=null; }
+
+    // =============================================
+    //  UTILITAS
+    // =============================================
+    function getProvClass(p) {
+        return {TELKOMSEL:'badge-tsel',XL:'badge-xl',AXIS:'badge-axis',INDOSAT:'badge-indo',SMARTFREN:'badge-smart',TRI:'badge-tri'}[p]||'badge-other';
+    }
+    function esc(s) { if(!s)return''; const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+    function fmtShort(iso) { if(!iso)return'-'; return new Date(iso).toLocaleDateString('id',{day:'2-digit',month:'short',year:'2-digit'}); }
+    function fmtFull(iso) { if(!iso)return'-'; return new Date(iso).toLocaleDateString('id',{day:'numeric',month:'long',year:'numeric'}); }
+    function copyUSSD(code) { navigator.clipboard.writeText(code).then(()=>toast(code+' disalin','i')).catch(()=>{}); }
+    function toast(msg, type) {
+        const t=document.createElement('div'); t.className=`toast toast-${type}`;
+        const ic={s:'fa-check-circle',e:'fa-circle-xmark',i:'fa-circle-info'};
+        t.innerHTML=`<i class="fa-solid ${ic[type]||ic.i}"></i> ${msg}`;
+        document.getElementById('toasts').appendChild(t);
+        setTimeout(()=>t.remove(),3000);
+    }
+
+    // Keyboard
+    document.addEventListener('keydown', e => { if(e.key==='Escape'){closeModal();closeConfirm();} });
+
+    // Responsive mobile search
+    function checkMobile() {
+        document.getElementById('mobileSearch').style.display = window.innerWidth<=768 ? 'block' : 'none';
+    }
+    window.addEventListener('resize', checkMobile);
+    checkMobile();
+
+    // Auto refresh setiap 60 detik (untuk update countdown)
+    setInterval(() => { renderStats(); renderTable(); }, 60000);
+    document.addEventListener('visibilitychange', () => { if(!document.hidden) renderAll(); });
+
+    // =============================================
+    //  JALANKAN!
+    // =============================================
+    initFirebase();
+    </script>
+</body>
+</html>
